@@ -71,10 +71,8 @@ class Sonarr(ArrBase):
     Quality profile to use for series in Sonarr.
     """
 
-    language_profile: Union[NonEmptyStr, int]
-    """
-    Quality profile to use for series in Sonarr.
-    """
+    language_profile: Optional[Union[NonEmptyStr, int]] = None
+    """Language profile to use for series in Sonarr, if supported by Seerr."""
 
     tags: Set[Union[NonEmptyStr, int]] = set()
     """
@@ -298,7 +296,7 @@ class Sonarr(ArrBase):
 
         # Seerr/Sonarr integrations don't always expose language profiles.
         # Only validate/manage them when the API provides IDs.
-        if language_profile_ids:
+        if language_profile_ids and resolved.language_profile is not None:
             resolved.language_profile = self._resolve_get_resource(  # type: ignore[assignment]
                 resource_description="language profile",
                 resource_ids=language_profile_ids,
