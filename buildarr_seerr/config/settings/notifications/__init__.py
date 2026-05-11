@@ -23,7 +23,6 @@ from ...types import SeerrConfigBase
 from .discord import DiscordSettings
 from .email import EmailSettings
 from .gotify import GotifySettings
-from .lunasea import LunaseaSettings
 from .pushbullet import PushbulletSettings
 from .pushover import PushoverSettings
 from .slack import SlackSettings
@@ -36,7 +35,6 @@ class SeerrNotificationsSettings(SeerrConfigBase):
     discord: DiscordSettings = DiscordSettings()
     email: EmailSettings = EmailSettings()
     gotify: GotifySettings = GotifySettings()
-    lunasea: LunaseaSettings = LunaseaSettings()
     pushbullet: PushbulletSettings = PushbulletSettings()
     pushover: PushoverSettings = PushoverSettings()
     slack: SlackSettings = SlackSettings()
