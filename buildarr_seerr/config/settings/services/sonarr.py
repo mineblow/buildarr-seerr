@@ -128,7 +128,7 @@ class Sonarr(ArrBase):
             language_profile_ids = {}
         if not tag_ids:
             tag_ids = {}
-        return [
+        remote_map: List[RemoteMapEntry] = [
             *cls._base_remote_map,
             ("api_key", "apiKey", {}),
             ("root_folder", "activeDirectory", {}),
@@ -150,19 +150,29 @@ class Sonarr(ArrBase):
                 "activeProfileName",
                 {"optional": True, "set_if": lambda v: isinstance(v, str)},
             ),
-            (
-                "language_profile",
-                "activeLanguageProfileId",
-                {
-                    # No decoder here: The language profile ID will get resolved
-                    # later *if* a Buildarr instance-to-instance link is used.
-                    "encoder": lambda v: (
-                        language_profile_ids[v]
-                        if language_profile_ids and isinstance(v, str)
-                        else v
-                    ),
-                },
-            ),
+        ]
+
+        # Seerr/Sonarr integrations don't always expose language profiles.
+        # Only manage the field when the API provides IDs to target.
+        if language_profile_ids:
+            remote_map.append(
+                (
+                    "language_profile",
+                    "activeLanguageProfileId",
+                    {
+                        # No decoder here: The language profile ID will get resolved
+                        # later *if* a Buildarr instance-to-instance link is used.
+                        "encoder": lambda v: (
+                            language_profile_ids[v]
+                            if language_profile_ids and isinstance(v, str)
+                            else v
+                        ),
+                    },
+                ),
+            )
+
+        remote_map.extend(
+            [
             (
                 "tags",
                 "tags",
@@ -230,7 +240,10 @@ class Sonarr(ArrBase):
                 },
             ),
             ("enable_season_folders", "enableSeasonFolders", {}),
-        ]
+            ],
+        )
+
+        return remote_map
 
     @classmethod
     def _from_remote(cls, remote_attrs: Mapping[str, Any]) -> Self:
