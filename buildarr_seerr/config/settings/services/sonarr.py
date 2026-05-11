@@ -71,8 +71,7 @@ class Sonarr(ArrBase):
     Quality profile to use for series in Sonarr.
     """
 
-    language_profile: Optional[Union[NonEmptyStr, int]] = None
-    """Language profile to use for series in Sonarr, if supported by Seerr."""
+    # Seerr does not use Sonarr language profiles.
 
     tags: Set[Union[NonEmptyStr, int]] = set()
     """
@@ -89,10 +88,7 @@ class Sonarr(ArrBase):
     Quality profile to use for series classified as anime in Sonarr.
     """
 
-    anime_language_profile: Optional[Union[NonEmptyStr, int]] = None
-    """
-    Language profile to use for series classified as anime in Sonarr.
-    """
+    # Seerr does not use Sonarr language profiles.
 
     anime_tags: Set[Union[NonEmptyStr, int]] = set()
     """
@@ -117,13 +113,10 @@ class Sonarr(ArrBase):
     def _get_remote_map(
         cls,
         quality_profile_ids: Optional[Mapping[str, int]] = None,
-        language_profile_ids: Optional[Mapping[str, int]] = None,
         tag_ids: Optional[Mapping[str, int]] = None,
     ) -> List[RemoteMapEntry]:
         if not quality_profile_ids:
             quality_profile_ids = {}
-        if not language_profile_ids:
-            language_profile_ids = {}
         if not tag_ids:
             tag_ids = {}
         remote_map: List[RemoteMapEntry] = [
@@ -149,25 +142,6 @@ class Sonarr(ArrBase):
                 {"optional": True, "set_if": lambda v: isinstance(v, str)},
             ),
         ]
-
-        # Seerr/Sonarr integrations don't always expose language profiles.
-        # Only manage the field when the API provides IDs to target.
-        if language_profile_ids:
-            remote_map.append(
-                (
-                    "language_profile",
-                    "activeLanguageProfileId",
-                    {
-                        # No decoder here: The language profile ID will get resolved
-                        # later *if* a Buildarr instance-to-instance link is used.
-                        "encoder": lambda v: (
-                            language_profile_ids[v]
-                            if language_profile_ids and isinstance(v, str)
-                            else v
-                        ),
-                    },
-                ),
-            )
 
         remote_map.extend(
             [
@@ -211,21 +185,7 @@ class Sonarr(ArrBase):
                 "activeAnimeProfileName",
                 {"optional": True, "set_if": lambda v: isinstance(v, str)},
             ),
-            (
-                "anime_language_profile",
-                "activeAnimeLanguageProfileId",
-                {
-                    # No decoder here: The language profile ID will get resolved
-                    # later *if* a Buildarr instance-to-instance link is used.
-                    "optional": True,
-                    "set_if": bool,
-                    "encoder": lambda v: (
-                        language_profile_ids[v]
-                        if language_profile_ids and isinstance(v, str)
-                        else v
-                    ),
-                },
-            ),
+            # Seerr does not support language profiles.
             (
                 "anime_tags",
                 "animeTags",
@@ -276,7 +236,6 @@ class Sonarr(ArrBase):
         api_key: str,
         root_folders: Set[str],
         quality_profile_ids: Mapping[str, int],
-        language_profile_ids: Mapping[str, int],
         tag_ids: Mapping[str, int],
         required: bool = True,
     ) -> Self:
@@ -294,15 +253,7 @@ class Sonarr(ArrBase):
             required=required,
         )
 
-        # Seerr/Sonarr integrations don't always expose language profiles.
-        # Only validate/manage them when the API provides IDs.
-        if language_profile_ids and resolved.language_profile is not None:
-            resolved.language_profile = self._resolve_get_resource(  # type: ignore[assignment]
-                resource_description="language profile",
-                resource_ids=language_profile_ids,
-                resource_ref=resolved.language_profile,
-                required=required,
-            )
+        # Seerr does not manage Sonarr language profiles.
         resolved.tags = set(
             self._resolve_get_resource(  # type: ignore[misc]
                 resource_description="tag",
@@ -321,17 +272,7 @@ class Sonarr(ArrBase):
             )
         else:
             resolved.anime_quality_profile = None
-        if resolved.anime_language_profile and language_profile_ids:
-            resolved.anime_language_profile = (
-                self._resolve_get_resource(  # type: ignore[assignment]
-                    resource_description="language profile",
-                    resource_ids=language_profile_ids,
-                    resource_ref=resolved.anime_language_profile,
-                    required=required,
-                )
-            )
-        else:
-            resolved.anime_language_profile = None
+        resolved.anime_language_profile = None
         resolved.anime_tags = set(
             self._resolve_get_resource(  # type: ignore[misc]
                 resource_description="tag",
@@ -377,7 +318,6 @@ class Sonarr(ArrBase):
         tree: str,
         secrets: SeerrSecrets,
         quality_profile_ids: Mapping[str, int],
-        language_profile_ids: Mapping[str, int],
         tag_ids: Mapping[str, int],
         service_name: str,
     ) -> None:
@@ -385,7 +325,7 @@ class Sonarr(ArrBase):
             "name": service_name,
             **self.get_create_remote_attrs(
                 tree=tree,
-                remote_map=self._get_remote_map(quality_profile_ids, language_profile_ids, tag_ids),
+                remote_map=self._get_remote_map(quality_profile_ids, tag_ids),
             ),
         }
         api_post(secrets, "/api/v1/settings/sonarr", {"name": service_name, **remote_attrs})
@@ -396,7 +336,6 @@ class Sonarr(ArrBase):
         secrets: SeerrSecrets,
         remote: Self,
         quality_profile_ids: Mapping[str, int],
-        language_profile_ids: Mapping[str, int],
         tag_ids: Mapping[str, int],
         service_id: int,
         service_name: str,
@@ -404,7 +343,7 @@ class Sonarr(ArrBase):
         changed, remote_attrs = self.get_update_remote_attrs(
             tree=tree,
             remote=remote,
-            remote_map=self._get_remote_map(quality_profile_ids, language_profile_ids, tag_ids),
+            remote_map=self._get_remote_map(quality_profile_ids, tag_ids),
             set_unchanged=True,
         )
         if changed:
@@ -599,50 +538,41 @@ class SonarrSettings(SeerrConfigBase):
                 for api_profile in (api_metadata.get("profiles") or [])
                 if api_profile.get("name") and api_profile.get("id") is not None
             }
-            language_profile_ids: Dict[str, int] = {
-                api_profile.get("name"): api_profile.get("id")
-                for api_profile in (api_metadata.get("languageProfiles") or [])
-                if api_profile.get("name") and api_profile.get("id") is not None
-            }
             tag_ids: Dict[str, int] = {
                 api_profile.get("label"): api_profile.get("id")
                 for api_profile in (api_metadata.get("tags") or [])
                 if api_profile.get("label") and api_profile.get("id") is not None
             }
-            resolved_service = service._resolve(
-                api_key=api_key,
-                root_folders=root_folders,
-                quality_profile_ids=quality_profile_ids,
-                language_profile_ids=language_profile_ids,
-                tag_ids=tag_ids,
-            )
-            if service_name not in remote.definitions:
-                resolved_service._create_remote(
-                    tree=profile_tree,
-                    secrets=secrets,
-                    quality_profile_ids=quality_profile_ids,
-                    language_profile_ids=language_profile_ids,
-                    tag_ids=tag_ids,
-                    service_name=service_name,
-                )
-                changed = True
-            elif resolved_service._update_remote(
-                tree=profile_tree,
-                secrets=secrets,
-                remote=remote.definitions[service_name]._resolve(  # type: ignore[arg-type]
+                resolved_service = service._resolve(
                     api_key=api_key,
                     root_folders=root_folders,
                     quality_profile_ids=quality_profile_ids,
-                    language_profile_ids=language_profile_ids,
                     tag_ids=tag_ids,
-                    required=False,
-                ),
-                quality_profile_ids=quality_profile_ids,
-                language_profile_ids=language_profile_ids,
-                tag_ids=tag_ids,
-                service_id=service_ids[service_name],
-                service_name=service_name,
-            ):
+                )
+            if service_name not in remote.definitions:
+                    resolved_service._create_remote(
+                        tree=profile_tree,
+                        secrets=secrets,
+                        quality_profile_ids=quality_profile_ids,
+                        tag_ids=tag_ids,
+                        service_name=service_name,
+                    )
+                changed = True
+                elif resolved_service._update_remote(
+                tree=profile_tree,
+                secrets=secrets,
+                    remote=remote.definitions[service_name]._resolve(  # type: ignore[arg-type]
+                        api_key=api_key,
+                        root_folders=root_folders,
+                        quality_profile_ids=quality_profile_ids,
+                        tag_ids=tag_ids,
+                        required=False,
+                    ),
+                    quality_profile_ids=quality_profile_ids,
+                    tag_ids=tag_ids,
+                    service_id=service_ids[service_name],
+                    service_name=service_name,
+                ):
                 changed = True
         # Return whether or not the remote instance was changed.
         return changed
@@ -692,11 +622,6 @@ class SonarrSettings(SeerrConfigBase):
                 for api_profile in (api_metadata.get("profiles") or [])
                 if api_profile.get("name") and api_profile.get("id") is not None
             }
-            language_profile_ids: Dict[str, int] = {
-                api_profile.get("name"): api_profile.get("id")
-                for api_profile in (api_metadata.get("languageProfiles") or [])
-                if api_profile.get("name") and api_profile.get("id") is not None
-            }
             tag_ids: Dict[str, int] = {
                 api_profile.get("label"): api_profile.get("id")
                 for api_profile in (api_metadata.get("tags") or [])
@@ -706,7 +631,6 @@ class SonarrSettings(SeerrConfigBase):
                 api_key=api_key,
                 root_folders=root_folders,
                 quality_profile_ids=quality_profile_ids,
-                language_profile_ids=language_profile_ids,
                 tag_ids=tag_ids,
             )
         self.definitions = resolved_definitions
