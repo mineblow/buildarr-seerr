@@ -26,6 +26,7 @@ from typing_extensions import Self
 
 from ....api import api_get, api_post
 from ....secrets import SeerrSecrets
+from ....exceptions import SeerrAPIError
 from ...types import SeerrConfigBase
 
 
@@ -63,7 +64,14 @@ class NotificationsSettingsBase(SeerrConfigBase):
 
     @classmethod
     def from_remote(cls, secrets: SeerrSecrets) -> Self:
-        remote_attrs = api_get(secrets, f"/api/v1/settings/notifications/{cls._type}")
+        try:
+            remote_attrs = api_get(secrets, f"/api/v1/settings/notifications/{cls._type}")
+        except SeerrAPIError as err:
+            # Seerr does not necessarily implement every notification backend.
+            # Treat missing endpoints as "not supported" and leave disabled.
+            if err.status_code == HTTPStatus.NOT_FOUND:
+                return cls()  # type: ignore[call-arg]
+            raise
         try:
             options_local_attrs = cls.get_local_attrs(
                 cls._get_remote_map(),
