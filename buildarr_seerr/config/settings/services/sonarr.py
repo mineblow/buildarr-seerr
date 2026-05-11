@@ -295,12 +295,16 @@ class Sonarr(ArrBase):
             resource_ref=resolved.quality_profile,
             required=required,
         )
-        resolved.language_profile = self._resolve_get_resource(  # type: ignore[assignment]
-            resource_description="language profile",
-            resource_ids=language_profile_ids,
-            resource_ref=resolved.language_profile,
-            required=required,
-        )
+
+        # Seerr/Sonarr integrations don't always expose language profiles.
+        # Only validate/manage them when the API provides IDs.
+        if language_profile_ids:
+            resolved.language_profile = self._resolve_get_resource(  # type: ignore[assignment]
+                resource_description="language profile",
+                resource_ids=language_profile_ids,
+                resource_ref=resolved.language_profile,
+                required=required,
+            )
         resolved.tags = set(
             self._resolve_get_resource(  # type: ignore[misc]
                 resource_description="tag",
@@ -319,7 +323,7 @@ class Sonarr(ArrBase):
             )
         else:
             resolved.anime_quality_profile = None
-        if resolved.anime_language_profile:
+        if resolved.anime_language_profile and language_profile_ids:
             resolved.anime_language_profile = (
                 self._resolve_get_resource(  # type: ignore[assignment]
                     resource_description="language profile",
