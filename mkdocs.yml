@@ -1,0 +1,38 @@
+site_name: Buildarr Seerr Plugin
+
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: false
+            show_source: false
+            show_bases: false
+
+markdown_extensions:
+  - toc:
+      permalink: "#"
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+
+nav:
+  - Release Notes: "release-notes.md"
+  - Configuration:
+    - Host Configuration: "configuration/host.md"
+    - Settings:
+      - General: "configuration/settings/general.md"
+      - Users: "configuration/settings/users.md"
+      - Jellyfin: "configuration/settings/jellyfin.md"
+      - Services:
+        - Sonarr: "configuration/settings/services/sonarr.md"
+        - Radarr: "configuration/settings/services/radarr.md"
+      - Notifications: "configuration/settings/notifications.md"
+  - Buildarr: "https://buildarr.github.io"
+  - GitHub: "https://github.com/buildarr/buildarr-seerr"
+
+watch:
+  - buildarr_seerr
